@@ -1,0 +1,427 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/old-prisma-client"
+}
+
+datasource old_db {
+  provider = "mysql"
+  url      = env("OLD_DATABASE_URL")
+}
+
+model Audio {
+  id            BigInt          @id @default(autoincrement())
+  name          String
+  url           String
+  enabled       Boolean         @default(true)
+  createdAt     DateTime?       @map("created_at")
+  updatedAt     DateTime?       @map("updated_at")
+  deletedAt     DateTime?       @map("deleted_at")
+  ChoicesLang   ChoicesLang[]
+  GroupsLang    GroupsLang[]
+  LicensesLang  LicensesLang[]
+  QuizzesLang   QuizzesLang[]
+  QuestionsLang QuestionsLang[]
+}
+
+model Authorizations {
+  id        BigInt      @id @default(autoincrement())
+  name      String
+  enabled   Boolean     @default(true)
+  createdAt DateTime?   @map("created_at")
+  updatedAt DateTime?   @map("updated_at")
+  UsersAuth UsersAuth[]
+}
+
+model Choices {
+  id               BigInt             @id @default(autoincrement())
+  enabled          Boolean            @default(true)
+  createdAt        DateTime?          @map("created_at")
+  updatedAt        DateTime?          @map("updated_at")
+  deletedAt        DateTime?          @map("deleted_at")
+  ChoicesLang      ChoicesLang[]
+  RelationsChoices RelationsChoices[]
+}
+
+model ChoicesLang {
+  id        BigInt    @id @default(autoincrement())
+  chId      BigInt    @map("ch_id")
+  lang      BigInt
+  text      String
+  hint      String?
+  audio     BigInt?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Choices   Choices   @relation(fields: [chId], references: [id], onDelete: Cascade)
+  Languages Languages @relation(fields: [lang], references: [id], onDelete: Cascade)
+  Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
+
+  @@unique([chId, lang, deletedAt])
+}
+
+model FailedJobs {
+  id         BigInt   @id @default(autoincrement())
+  uuid       String   @unique
+  connection String
+  queue      String
+  payload    String
+  exception  String
+  failedAt   DateTime @default(now()) @map("failed_at")
+}
+
+model Groups {
+  id        BigInt    @id @default(autoincrement())
+  code      String
+  level     Int       @default(1)
+  media     BigInt?
+  randCount Int       @default(0) @map("rand_count")
+  enabled   Boolean   @default(true)
+  other     String?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Media       Media?        @relation(fields: [media], references: [id], onDelete: SetNull)
+  GroupsLang  GroupsLang[]
+  Relations   Relations[]
+  UsersGroups UsersGroups[]
+
+  @@unique([code, deletedAt])
+}
+
+model GroupsLang {
+  id        BigInt    @id @default(autoincrement())
+  gpId      BigInt    @map("gp_id")
+  lang      BigInt
+  name      String
+  desc      String?
+  audio     BigInt?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Groups    Groups    @relation(fields: [gpId], references: [id], onDelete: Cascade)
+  Languages Languages @relation(fields: [lang], references: [id], onDelete: Cascade)
+  Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
+
+  @@unique([gpId, lang, deletedAt])
+}
+
+model Languages {
+  id           BigInt    @id @default(autoincrement())
+  name         String
+  code         String    @unique
+  voiceCode    String    @map("voice_code")
+  voiceType    String    @map("voice_type")
+  voiceName    String    @map("voice_name")
+  voiceGender  String    @map("voice_gender")
+  voiceProfile String    @map("voice_profile")
+  enabled      Boolean   @default(true)
+  createdAt    DateTime? @map("created_at")
+  updatedAt    DateTime? @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  ChoicesLang   ChoicesLang[]
+  GroupsLang    GroupsLang[]
+  LicensesLang  LicensesLang[]
+  QuestionsLang QuestionsLang[]
+  QuizzesLang   QuizzesLang[]
+}
+
+model Licenses {
+  id        BigInt    @id @default(autoincrement())
+  code      String
+  media     BigInt?
+  enabled   Boolean   @default(true)
+  other     String?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Media        Media?         @relation(fields: [media], references: [id], onDelete: SetNull)
+  LicensesLang LicensesLang[]
+  Relations    Relations[]
+
+  @@unique([code, deletedAt])
+}
+
+model LicensesLang {
+  id        BigInt    @id @default(autoincrement())
+  liId      BigInt    @map("li_id")
+  lang      BigInt
+  name      String
+  desc      String?
+  audio     BigInt?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Licenses  Licenses  @relation(fields: [liId], references: [id], onDelete: Cascade)
+  Languages Languages @relation(fields: [lang], references: [id], onDelete: Cascade)
+  Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
+
+  @@unique([liId, lang, deletedAt])
+}
+
+model Media {
+  id           BigInt    @id @default(autoincrement())
+  name         String
+  extension    String
+  url          String
+  uploadedName String    @map("uploaded_name")
+  enabled      Boolean   @default(true)
+  createdAt    DateTime? @map("created_at")
+  updatedAt    DateTime? @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  Groups             Groups[]
+  Licenses           Licenses[]
+  RelationsChoices   RelationsChoices[]
+  RelationsQuestions RelationsQuestions[]
+  Quizzes            Quizzes[]
+}
+
+model Migrations {
+  id        Int    @id @default(autoincrement())
+  migration String
+  batch     Int
+}
+
+model PasswordResets {
+  email     String    @id
+  token     String
+  createdAt DateTime? @map("created_at")
+}
+
+model Questions {
+  id                 BigInt               @id @default(autoincrement())
+  enabled            Boolean              @default(true)
+  createdAt          DateTime?            @map("created_at")
+  updatedAt          DateTime?            @map("updated_at")
+  deletedAt          DateTime?            @map("deleted_at")
+  QuestionsLang      QuestionsLang[]
+  RelationsQuestions RelationsQuestions[]
+}
+
+model QuestionsLang {
+  id        BigInt    @id @default(autoincrement())
+  qsId      BigInt    @map("qs_id")
+  lang      BigInt
+  text      String
+  hint      String?
+  audio     BigInt?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Questions Questions @relation(fields: [qsId], references: [id], onDelete: Cascade)
+  Languages Languages @relation(fields: [lang], references: [id], onDelete: Cascade)
+  Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
+
+  @@unique([qsId, lang, deletedAt])
+}
+
+model Quizzes {
+  id        BigInt    @id @default(autoincrement())
+  code      String
+  duration  Int       @default(100)
+  level     Int       @default(1)
+  media     BigInt?
+  enabled   Boolean   @default(true)
+  other     String?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Media       Media?        @relation(fields: [media], references: [id], onDelete: SetNull)
+  QuizzesLang QuizzesLang[]
+  Relations   Relations[]
+
+  @@unique([code, deletedAt])
+}
+
+model QuizzesLang {
+  id        BigInt    @id @default(autoincrement())
+  qzId      BigInt    @map("qz_id")
+  lang      BigInt
+  name      String
+  desc      String?
+  audio     BigInt?
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Quizzes   Quizzes   @relation(fields: [qzId], references: [id], onDelete: Cascade)
+  Languages Languages @relation(fields: [lang], references: [id], onDelete: Cascade)
+  Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
+
+  @@unique([qzId, lang, deletedAt])
+}
+
+model Relations {
+  id        BigInt    @id @default(autoincrement())
+  liId      BigInt    @map("li_id")
+  gpId      BigInt    @map("gp_id")
+  qzId      BigInt    @map("qz_id")
+  enabled   Boolean   @default(true)
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Licenses           Licenses             @relation(fields: [liId], references: [id])
+  Groups             Groups               @relation(fields: [gpId], references: [id])
+  Quizzes            Quizzes              @relation(fields: [qzId], references: [id])
+  RelationsChoices   RelationsChoices[]
+  RelationsQuestions RelationsQuestions[]
+  UsersRelations     UsersRelations[]
+
+  @@unique([liId, gpId, qzId, deletedAt])
+}
+
+model RelationsChoices {
+  id        BigInt    @id @default(autoincrement())
+  rqId      BigInt    @map("rq_id")
+  chId      BigInt    @map("ch_id")
+  mdId      BigInt?
+  correct   Boolean   @default(false)
+  ordering  Int       @default(1)
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Choices               Choices                 @relation(fields: [chId], references: [id])
+  Media                 Media?                  @relation(fields: [mdId], references: [id])
+  RelationsQuestions    RelationsQuestions      @relation(fields: [rqId], references: [id])
+  Relations             Relations?              @relation(fields: [relationsId], references: [id])
+  relationsId           BigInt?
+  UsersRelationsDetails UsersRelationsDetails[]
+
+  @@unique([rqId, chId, mdId, deletedAt])
+}
+
+model RelationsQuestions {
+  id        BigInt    @id @default(autoincrement())
+  reId      BigInt    @map("re_id")
+  qsId      BigInt    @map("qs_id")
+  mdId      BigInt?
+  ordering  Int       @default(1)
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Questions             Questions               @relation(fields: [qsId], references: [id])
+  Media                 Media?                  @relation(fields: [mdId], references: [id])
+  Relations             Relations               @relation(fields: [reId], references: [id])
+  RelationsChoices      RelationsChoices[]
+  UsersRelationsDetails UsersRelationsDetails[]
+
+  @@unique([reId, qsId, deletedAt])
+}
+
+model Users {
+  id                     BigInt    @id @default(autoincrement())
+  personalNumber         String    @unique @map("personal_number")
+  name                   String
+  email                  String    @unique
+  phone                  String?
+  location               BigInt
+  admin                  Boolean   @default(false)
+  enabled                Boolean   @default(true)
+  activationDate         DateTime  @default(now()) @map("activation_date")
+  rememberToken          String?   @map("remember_token")
+  emailVerifiedAt        DateTime? @map("email_verified_at")
+  password               String?
+  twoFactorSecret        String?   @map("two_factor_secret")
+  twoFactorRecoveryCodes String?   @map("two_factor_recovery_codes")
+  createdAt              DateTime? @map("created_at")
+  updatedAt              DateTime? @map("updated_at")
+  deletedAt              DateTime? @map("deleted_at")
+
+  Locations      Locations        @relation(fields: [location], references: [id])
+  UsersAuth      UsersAuth[]
+  UsersGroups    UsersGroups[]
+  UsersLogin     UsersLogin[]
+  UsersRelations UsersRelations[]
+}
+
+model UsersAuth {
+  id        BigInt    @id @default(autoincrement())
+  usId      BigInt    @map("us_id")
+  auId      BigInt    @map("au_id")
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Authorizations Authorizations @relation(fields: [auId], references: [id])
+  Users          Users          @relation(fields: [usId], references: [id])
+
+  @@unique([usId, auId, deletedAt])
+}
+
+model UsersGroups {
+  id        BigInt    @id @default(autoincrement())
+  usId      BigInt    @map("us_id")
+  gpId      BigInt    @map("gp_id")
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  Groups Groups @relation(fields: [gpId], references: [id])
+  Users  Users  @relation(fields: [usId], references: [id])
+
+  @@unique([usId, gpId, deletedAt])
+}
+
+model UsersLogin {
+  id        BigInt    @id @default(autoincrement())
+  usId      BigInt    @map("us_id")
+  action    Boolean   @default(true)
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  Users Users @relation(fields: [usId], references: [id])
+}
+
+model UsersRelations {
+  id        BigInt    @id @default(autoincrement())
+  usId      BigInt    @map("us_id")
+  reId      BigInt    @map("re_id")
+  correct   Int
+  wrong     Int
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  Relations             Relations               @relation(fields: [reId], references: [id])
+  Users                 Users                   @relation(fields: [usId], references: [id])
+  UsersRelationsDetails UsersRelationsDetails[]
+}
+
+model UsersRelationsDetails {
+  id        BigInt    @id @default(autoincrement())
+  urId      BigInt    @map("ur_id")
+  rqId      BigInt    @map("rq_id")
+  rcId      BigInt    @map("rc_id")
+  observed  Boolean   @default(false)
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  UsersRelations     UsersRelations     @relation(fields: [urId], references: [id])
+  RelationsChoices   RelationsChoices   @relation(fields: [rcId], references: [id])
+  RelationsQuestions RelationsQuestions @relation(fields: [rqId], references: [id])
+}
+
+model Locations {
+  id        BigInt    @id @default(autoincrement())
+  location  String
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  Users     Users[]
+}

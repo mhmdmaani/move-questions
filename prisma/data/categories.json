@@ -1,0 +1,68 @@
+[
+    {
+      "id": "category1",
+      "name": {
+        "ar": "معرفة المركبات، المناورة",
+        "sv": "Fordonskunskap, manövrering",
+        "en": "Vehicle knowledge, maneuvering",
+        "ru": "Знание транспортных средств, маневрирование",
+        "tr": "Araç bilgisi, manevra",
+        "so": "Aqoonta gaadiidka, maaraynta"
+      }
+    },
+    {
+      "id": "category2",
+      "name": {
+        "ar": "البيئة",
+        "sv": "Miljö",
+        "en": "Environment",
+        "ru": "Окружающая среда",
+        "tr": "Çevre",
+        "so": "Deegaanka"
+      }
+    },
+    {
+      "id": "category3",
+      "name": {
+        "ar": "السلامة المرورية",
+        "sv": "Trafiksäkerhet",
+        "en": "Traffic safety",
+        "ru": "Безопасность дорожного движения",
+        "tr": "Trafik güvenliği",
+        "so": "Badbaadada taraafikada"
+      }
+    },
+    {
+      "id": "category4",
+      "name": {
+        "ar": "قواعد حركة السير",
+        "sv": "Trafikregler",
+        "en": "Traffic rules",
+        "ru": "Правила дорожного движения",
+        "tr": "Trafik kuralları",
+        "so": "Sharciyada taraafikada"
+      }
+    },
+    {
+      "id": "category5",
+      "name": {
+        "ar": "المتطلبات الشخصية",
+        "sv": "Personliga krav",
+        "en": "Personal requirements",
+        "ru": "Личные требования",
+        "tr": "Kişisel gereksinimler",
+        "so": "Shuruudaha shakhsiga"
+      }
+    },
+    {
+      "id": "category6",
+      "name": {
+        "ar": "التعرف على الإشارات",
+        "sv": "Igenkänning av skyltar",
+        "en": "Sign recognition",
+        "ru": "Распознавание знаков",
+        "tr": "İşaret tanıma",
+        "so": "Aqoonsiga calaamadaha"
+      }
+    }
+  ]

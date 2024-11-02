@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/new-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NEW_DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  firstName    String
+  lastName     String
+  personnr     String
+  tel          String
+  email        String        @unique
+  password     String
+  isActive     Boolean       @default(true)
+  expiryDate   DateTime
+  courses      Course[]
+  userAttempts UserAttempt[]
+}
+
+model Course {
+  id          String        @id @default(cuid())
+  image       String?
+  isActive    Boolean       @default(true)
+  name        Text[]        @relation(name: "course_names")
+  description Text[]        @relation(name: "course_descriptions")
+  users       User[]
+  questions   Question[]
+  UserAttempt UserAttempt[]
+}
+
+model Category {
+  id          String        @id @default(cuid())
+  image       String?
+  questions   Question[]
+  name        Text[]        @relation(name: "category_names")
+  UserAttempt UserAttempt[]
+}
+
+model Question {
+  id              String            @id @default(cuid())
+  text            Text[]            @relation(name: "question_texts")
+  categories      Category[]
+  course          Course            @relation(fields: [courseId], references: [id])
+  courseId        String
+  answers         Answer[]
+  questionMedia   QuestionMedia[]
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  AttemptQuestion AttemptQuestion[]
+  hint            Text[]            @relation(name: "question_hints")
+}
+
+model Answer {
+  id                String             @id @default(cuid())
+  text              Text[]             @relation(name: "answer_texts")
+  mediaId           String?
+  media             Media?             @relation(fields: [mediaId], references: [id])
+  isActive          Boolean            @default(true)
+  questionId        String
+  isCorrect         Boolean
+  question          Question           @relation(fields: [questionId], references: [id])
+  answeredQuestions AnsweredQuestion[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
+}
+
+model QuestionMedia {
+  id         String   @id @default(cuid())
+  questionId String
+  mediaId    String
+  order      Int
+  question   Question @relation(fields: [questionId], references: [id])
+  media      Media    @relation(fields: [mediaId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model Media {
+  id            String          @id @default(cuid())
+  url           String
+  type          String?         @default("image")
+  description   String?
+  questionMedia QuestionMedia[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  answer        Answer[]
+}
+
+model UserAttempt {
+  id                   String             @id @default(cuid())
+  userId               String
+  date                 DateTime
+  result               Float
+  user                 User               @relation(fields: [userId], references: [id])
+  course               Course?            @relation(fields: [courseId], references: [id])
+  courseId             String?
+  answeredQuestions    AnsweredQuestion[]
+  categories           Category[]
+  isTimed              Boolean
+  isInstantResult      Boolean
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @default(now()) @updatedAt
+  questions            AttemptQuestion[]
+  currentQuestionIndex Int                @default(0)
+  endTime              DateTime?
+}
+
+model AttemptQuestion {
+  id            String      @id @default(cuid())
+  userAttemptId String
+  questionId    String
+  userAttempt   UserAttempt @relation(fields: [userAttemptId], references: [id])
+  question      Question    @relation(fields: [questionId], references: [id])
+  order         Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  isMarked      Boolean     @default(false)
+  isAnswered    Boolean     @default(false)
+}
+
+model AnsweredQuestion {
+  id            String      @id @default(cuid())
+  userAttemptId String
+  answerId      String
+  userAttempt   UserAttempt @relation(fields: [userAttemptId], references: [id])
+  answer        Answer      @relation(fields: [answerId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+}
+
+model Text {
+  id                  String    @id @default(cuid())
+  value               String
+  languageId          String
+  language            Language  @relation(fields: [languageId], references: [id])
+  CourseDescription   Course?   @relation(fields: [courseDescriptionId], references: [id], name: "course_descriptions")
+  courseDescriptionId String?
+  CourseName          Course?   @relation(fields: [courseNameId], references: [id], name: "course_names")
+  courseNameId        String?
+  CategoryName        Category? @relation(fields: [categoryNameId], references: [id], name: "category_names")
+  categoryNameId      String?
+  Question            Question? @relation(fields: [questionId], references: [id], name: "question_texts")
+  questionId          String?
+  Answer              Answer?   @relation(fields: [answerId], references: [id], name: "answer_texts")
+  answerId            String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+  questionHint        Question? @relation(fields: [questionHintId], references: [id], name: "question_hints")
+  questionHintId      String?
+}
+
+model Language {
+  id       String  @id @default(cuid())
+  name     String
+  code     String
+  isActive Boolean @default(true)
+  isRTL    Boolean
+  strings  Text[]
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model Settings {
+  id               String @id @default(uuid())
+  userAvailability Int    @default(180) // in days
+  testTime         Int    @default(60) // in minutes
+  questionsPerTest Int    @default(70)
+}
