@@ -58,32 +58,32 @@ export class AppService {
       for (const gr of grs) {
         await newDbClient.course.create({
           data: {
-            id: gr.id.toString(),
+            id: gr?.id?.toString(),
             name: {
               createMany: {
-                data: gr.GroupsLang.map((g) => ({
-                  value: g.name.toString(),
-                  languageId: g.lang.toString(),
+                data: gr?.GroupsLang?.map((g) => ({
+                  value: g?.name?.toString(),
+                  languageId: g?.lang?.toString(),
                 })),
               },
             },
             description: {
               createMany: {
-                data: gr.GroupsLang.map((g) => ({
-                  value: g.desc.toString(),
-                  languageId: g.lang.toString(),
+                data: gr?.GroupsLang?.map((g) => ({
+                  value: g?.desc?.toString(),
+                  languageId: g?.lang?.toString(),
                 })),
               },
             },
 
-            isActive: gr.enabled,
+            isActive: gr?.enabled,
           },
         });
       }
 
       // Step 4: Migrate Questions
       console.log('Migrating question data...');
-      const quess = await oldDbClient.questions.findMany({
+      const quess = await oldDbClient?.questions?.findMany({
         where: {
           enabled: true,
         },
@@ -101,35 +101,35 @@ export class AppService {
       for (const question of quess) {
         await newDbClient.question.create({
           data: {
-            id: question.id.toString(),
+            id: question?.id?.toString(),
             text: {
               createMany: {
-                data: question.QuestionsLang.map((q) => ({
-                  value: q.text.toString(),
-                  languageId: q.lang.toString(),
+                data: question?.QuestionsLang?.map((q) => ({
+                  value: q?.text?.toString(),
+                  languageId: q?.lang?.toString(),
                 })),
               },
             },
             hint: {
               createMany: {
-                data: question.QuestionsLang.map((q) => ({
-                  value: q.hint.toString(),
-                  languageId: q.lang.toString(),
+                data: question?.QuestionsLang?.map((q) => ({
+                  value: q?.hint?.toString(),
+                  languageId: q?.lang?.toString(),
                 })),
               },
             },
-            isActive: question.enabled,
-            createdAt: question.createdAt,
-            updatedAt: question.updatedAt,
+            isActive: question?.enabled,
+            createdAt: question?.createdAt,
+            updatedAt: question?.updatedAt,
             categories: {
               connect: savedCategories.map((c) => ({
-                id: c.id,
+                id: c?.id,
               })),
             },
-            course: question.RelationsQuestions &&
-              question.RelationsQuestions.length > 0 && {
+            course: question?.RelationsQuestions &&
+              question?.RelationsQuestions?.length > 0 && {
                 connect: {
-                  id: question.RelationsQuestions[0].Relations.gpId.toString(),
+                  id: question?.RelationsQuestions[0]?.Relations?.gpId?.toString(),
                 },
               },
           },
@@ -137,7 +137,7 @@ export class AppService {
       }
       // Step 5: Migrate Answers
       console.log('Migrating answer data...');
-      const choices = await oldDbClient.choices.findMany({
+      const choices = await oldDbClient?.choices?.findMany({
         where: {
           enabled: true,
         },
@@ -152,25 +152,25 @@ export class AppService {
       });
 
       for (const choice of choices.filter(
-        (c) => c.RelationsChoices.length > 0,
+        (c) => c?.RelationsChoices?.length > 0,
       )) {
         await newDbClient.answer.create({
           data: {
-            id: choice.id.toString(),
+            id: choice?.id?.toString(),
             text: {
               createMany: {
-                data: choice.ChoicesLang.map((c) => ({
-                  value: c.text.toString(),
-                  languageId: c.lang.toString(),
+                data: choice?.ChoicesLang?.map((c) => ({
+                  value: c?.text?.toString(),
+                  languageId: c?.lang?.toString(),
                 })),
               },
             },
-            isCorrect: !!choice.RelationsChoices.find(
-              (c) => c.correct === true,
+            isCorrect: !!choice?.RelationsChoices?.find(
+              (c) => c?.correct === true,
             ),
             question: {
               connect: {
-                id: choice.RelationsChoices[0].RelationsQuestions.qsId.toString(),
+                id: choice?.RelationsChoices[0]?.RelationsQuestions?.qsId?.toString(),
               },
             },
           },
@@ -189,22 +189,22 @@ export class AppService {
       });
 
       for (const media of medias) {
-        await newDbClient.media.create({
+        await newDbClient?.media?.create({
           data: {
-            id: media.id.toString(),
-            url: media.url,
-            type: media.extension || 'image',
-            description: media.name,
-            questionMedia: media.RelationsQuestions &&
-              media.RelationsQuestions.length > 0 && {
+            id: media?.id?.toString(),
+            url: media?.url,
+            type: media?.extension || 'image',
+            description: media?.name,
+            questionMedia: media?.RelationsQuestions &&
+              media?.RelationsQuestions?.length > 0 && {
                 connect: {
-                  id: media.RelationsQuestions[0].qsId.toString(),
+                  id: media?.RelationsQuestions[0]?.qsId.toString(),
                 },
               },
-            answer: media.RelationsChoices &&
-              media.RelationsChoices.length > 0 && {
+            answer: media?.RelationsChoices &&
+              media?.RelationsChoices?.length > 0 && {
                 connect: {
-                  id: media.RelationsChoices[0].chId.toString(),
+                  id: media?.RelationsChoices[0]?.chId?.toString(),
                 },
               },
           },
@@ -226,18 +226,18 @@ export class AppService {
       for (const user of users) {
         await newDbClient.user.create({
           data: {
-            id: user.personalNumber,
-            firstName: user.name.split(' ')[0], // Assuming first part is first name
-            lastName: user.name.split(' ')[1] || '',
-            email: user.email,
-            tel: user.phone || '',
-            isActive: user.enabled,
+            id: user?.personalNumber,
+            firstName: user?.name?.split(' ')[0], // Assuming first part is first name
+            lastName: user?.name?.split(' ')[1] || '',
+            email: user?.email,
+            tel: user?.phone || '',
+            isActive: user?.enabled,
             expiryDate: addMonths(new Date(user.activationDate), 6),
             password: '',
-            personnr: user.personalNumber,
+            personnr: user?.personalNumber,
             courses: {
-              connect: user.UsersGroups.map((g) => ({
-                id: g.gpId.toString(),
+              connect: user?.UsersGroups.map((g) => ({
+                id: g?.gpId?.toString(),
               })),
             },
             // Set this based on your logic

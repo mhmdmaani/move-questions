@@ -5,8 +5,9 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/old-prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../src/old-prisma-client"
+  binaryTargets = ["native", "windows", "debian-openssl-1.1.x"]
 }
 
 datasource old_db {
@@ -27,6 +28,8 @@ model Audio {
   LicensesLang  LicensesLang[]
   QuizzesLang   QuizzesLang[]
   QuestionsLang QuestionsLang[]
+
+  @@map("audio")
 }
 
 model Authorizations {
@@ -36,6 +39,8 @@ model Authorizations {
   createdAt DateTime?   @map("created_at")
   updatedAt DateTime?   @map("updated_at")
   UsersAuth UsersAuth[]
+
+  @@map("authorizations")
 }
 
 model Choices {
@@ -46,6 +51,8 @@ model Choices {
   deletedAt        DateTime?          @map("deleted_at")
   ChoicesLang      ChoicesLang[]
   RelationsChoices RelationsChoices[]
+
+  @@map("choices")
 }
 
 model ChoicesLang {
@@ -64,6 +71,7 @@ model ChoicesLang {
   Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
 
   @@unique([chId, lang, deletedAt])
+  @@map("choices_lang")
 }
 
 model FailedJobs {
@@ -74,6 +82,8 @@ model FailedJobs {
   payload    String
   exception  String
   failedAt   DateTime @default(now()) @map("failed_at")
+
+  @@map("failed_jobs")
 }
 
 model Groups {
@@ -94,6 +104,7 @@ model Groups {
   UsersGroups UsersGroups[]
 
   @@unique([code, deletedAt])
+  @@map("groups")
 }
 
 model GroupsLang {
@@ -112,6 +123,7 @@ model GroupsLang {
   Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
 
   @@unique([gpId, lang, deletedAt])
+  @@map("groups_lang")
 }
 
 model Languages {
@@ -133,6 +145,8 @@ model Languages {
   LicensesLang  LicensesLang[]
   QuestionsLang QuestionsLang[]
   QuizzesLang   QuizzesLang[]
+
+  @@map("languages")
 }
 
 model Licenses {
@@ -150,6 +164,7 @@ model Licenses {
   Relations    Relations[]
 
   @@unique([code, deletedAt])
+  @@map("licenses")
 }
 
 model LicensesLang {
@@ -168,6 +183,7 @@ model LicensesLang {
   Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
 
   @@unique([liId, lang, deletedAt])
+  @@map("licenses_lang")
 }
 
 model Media {
@@ -186,6 +202,8 @@ model Media {
   RelationsChoices   RelationsChoices[]
   RelationsQuestions RelationsQuestions[]
   Quizzes            Quizzes[]
+
+  @@map("media")
 }
 
 model Migrations {
@@ -198,6 +216,8 @@ model PasswordResets {
   email     String    @id
   token     String
   createdAt DateTime? @map("created_at")
+
+  @@map("password_resets")
 }
 
 model Questions {
@@ -208,6 +228,8 @@ model Questions {
   deletedAt          DateTime?            @map("deleted_at")
   QuestionsLang      QuestionsLang[]
   RelationsQuestions RelationsQuestions[]
+
+  @@map("questions")
 }
 
 model QuestionsLang {
@@ -226,6 +248,7 @@ model QuestionsLang {
   Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
 
   @@unique([qsId, lang, deletedAt])
+  @@map("questions_lang")
 }
 
 model Quizzes {
@@ -245,6 +268,7 @@ model Quizzes {
   Relations   Relations[]
 
   @@unique([code, deletedAt])
+  @@map("quizzes")
 }
 
 model QuizzesLang {
@@ -263,6 +287,7 @@ model QuizzesLang {
   Audio     Audio?    @relation(fields: [audio], references: [id], onDelete: SetNull)
 
   @@unique([qzId, lang, deletedAt])
+  @@map("quizzes_lang")
 }
 
 model Relations {
@@ -283,6 +308,7 @@ model Relations {
   UsersRelations     UsersRelations[]
 
   @@unique([liId, gpId, qzId, deletedAt])
+  @@map("relations")
 }
 
 model RelationsChoices {
@@ -304,6 +330,7 @@ model RelationsChoices {
   UsersRelationsDetails UsersRelationsDetails[]
 
   @@unique([rqId, chId, mdId, deletedAt])
+  @@map("relations_choices")
 }
 
 model RelationsQuestions {
@@ -323,6 +350,7 @@ model RelationsQuestions {
   UsersRelationsDetails UsersRelationsDetails[]
 
   @@unique([reId, qsId, deletedAt])
+  @@map("relations_questions")
 }
 
 model Users {
@@ -349,6 +377,8 @@ model Users {
   UsersGroups    UsersGroups[]
   UsersLogin     UsersLogin[]
   UsersRelations UsersRelations[]
+
+  @@map("users")
 }
 
 model UsersAuth {
@@ -363,6 +393,7 @@ model UsersAuth {
   Users          Users          @relation(fields: [usId], references: [id])
 
   @@unique([usId, auId, deletedAt])
+  @@map("users_auth")
 }
 
 model UsersGroups {
@@ -377,6 +408,7 @@ model UsersGroups {
   Users  Users  @relation(fields: [usId], references: [id])
 
   @@unique([usId, gpId, deletedAt])
+  @@map("users_groups")
 }
 
 model UsersLogin {
@@ -387,6 +419,8 @@ model UsersLogin {
   updatedAt DateTime? @map("updated_at")
 
   Users Users @relation(fields: [usId], references: [id])
+
+  @@map("users_login")
 }
 
 model UsersRelations {
@@ -401,6 +435,8 @@ model UsersRelations {
   Relations             Relations               @relation(fields: [reId], references: [id])
   Users                 Users                   @relation(fields: [usId], references: [id])
   UsersRelationsDetails UsersRelationsDetails[]
+
+  @@map("users_relations")
 }
 
 model UsersRelationsDetails {
@@ -415,6 +451,8 @@ model UsersRelationsDetails {
   UsersRelations     UsersRelations     @relation(fields: [urId], references: [id])
   RelationsChoices   RelationsChoices   @relation(fields: [rcId], references: [id])
   RelationsQuestions RelationsQuestions @relation(fields: [rqId], references: [id])
+
+  @@map("users_relations_details")
 }
 
 model Locations {
@@ -424,4 +462,6 @@ model Locations {
   updatedAt DateTime? @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
   Users     Users[]
+
+  @@map("locations")
 }
