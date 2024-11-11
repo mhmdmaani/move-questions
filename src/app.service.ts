@@ -1,183 +1,557 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClient as OldPrismaClient } from '../old-prisma-client';
 import { PrismaClient as NewPrismaClient } from '../new-prisma-client';
+import * as crypto from 'crypto';
+import { Prisma } from '../new-prisma-client';
 
 @Injectable()
 export class AppService {
-  async moveData() {
-    console.log('Starting data migration...');
-    const oldDbClient = new OldPrismaClient();
-    const newDbClient = new NewPrismaClient();
+  private readonly oldPrisma = new OldPrismaClient();
+  private readonly newPrisma = new NewPrismaClient();
 
+  private async handleDuplicateCreate<T>(
+    operation: () => Promise<T>,
+    context: string
+  ): Promise<T | null> {
     try {
-      // Migrate Languages
-      console.log('Migrating language data...');
-      const languages = await oldDbClient.languages.findMany();
-      for (const lang of languages) {
-        await newDbClient.language.create({
-          data: {
-            id: lang.id.toString(),
-            name: lang.name,
-            code: lang.code,
-            isActive: lang.enabled,
-            isRTL: lang.name === 'arabic',
-          },
-        });
-      }
-
-      // Migrate Categories
-      console.log('Migrating category data...');
-      await this.seedCategories();
-
-      const savedCategories = await newDbClient.category.findMany();
-
-      // Migrate Courses
-      console.log('Migrating course data...');
-      const groups = await oldDbClient.groups.findMany({
-        include: { GroupsLang: true },
-      });
-
-      for (const group of groups) {
-        const courseNames = group?.GroupsLang?.map(g => ({
-          value: g?.name?.toString(),
-          languageId: g?.lang?.toString(),
-        })).filter(name => name.value); // Filter out null/undefined values
-
-        const courseDescriptions = group?.GroupsLang?.map(g => ({
-          value: g?.desc?.toString(),
-          languageId: g?.lang?.toString(),
-        })).filter(desc => desc.value);
-
-        await newDbClient.course.create({
-          data: {
-            id: group?.id?.toString(),
-            name: { createMany: { data: courseNames } },
-            description: { createMany: { data: courseDescriptions } },
-            isActive: group?.enabled,
-          },
-        });
-      }
-
-      // Migrate Questions
-      console.log('Migrating question data...');
-      const questions = await oldDbClient?.questions?.findMany({
-        where: { enabled: true },
-        include: {
-          QuestionsLang: true,
-          RelationsQuestions: {
-            include: { Relations: true, Media: true },
-          },
-        },
-      });
-
-      for (const question of questions) {
-        const questionTexts = question?.QuestionsLang?.map(q => ({
-          value: q?.text?.toString(),
-          languageId: q?.lang?.toString(),
-        })).filter(text => text.value);
-
-        const questionHints = question?.QuestionsLang?.map(q => ({
-          value: q?.hint?.toString(),
-          languageId: q?.lang?.toString(),
-        })).filter(hint => hint.value);
-
-        await newDbClient.question.create({
-          data: {
-            id: question?.id?.toString(),
-            text: { createMany: { data: questionTexts } },
-            hint: { createMany: { data: questionHints } },
-            isActive: question?.enabled,
-            createdAt: question?.createdAt||new Date (),
-            updatedAt: question?.updatedAt||new Date (),
-            categories: {
-              connect: savedCategories.map(c => ({ id: c?.id })),
-            },
-            course: question?.RelationsQuestions.length > 0  &&
-              question?.RelationsQuestions.length > 0 ? {
-                connect: { id: question?.RelationsQuestions[0]?.Relations?.gpId?.toString() },
-              }:{
-                connect:{
-
-                    id:"2"
-                }
-              },
-          },
-        });
-      }
-
-      // Migrate Answers
-      console.log('Migrating answer data...');
-      const choices = await oldDbClient.choices.findMany({
-        where: { enabled: true },
-        include: { ChoicesLang: true, RelationsChoices: { include: { RelationsQuestions: true } } },
-      });
-
-      for (const choice of choices.filter(c => c?.RelationsChoices?.length > 0)) {
-        const choiceTexts = choice?.ChoicesLang?.map(c => ({
-          value: c?.text?.toString(),
-          languageId: c?.lang?.toString(),
-        })).filter(text => text.value);
-
-        await newDbClient.answer.create({
-          data: {
-            id: choice?.id?.toString(),
-            text: { createMany: { data: choiceTexts } },
-            isCorrect: !!choice?.RelationsChoices?.find(c => c?.correct === true),
-            question: {
-              connect: {
-                id: choice?.RelationsChoices[0]?.RelationsQuestions?.qsId?.toString(),
-              },
-            },
-          },
-        });
-      }
-
-      // Additional migrations can be updated in a similar way...
-
-      console.log('Data migration completed.');
+      return await operation();
     } catch (error) {
-      console.error('Error migrating data:', error);
-    } finally {
-      await oldDbClient.$disconnect();
-      await newDbClient.$disconnect();
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          console.log(`Skipping duplicate ${context}`);
+          return null;
+        }
+      }
+      throw error;
     }
   }
 
-  async seedCategories() {
-    const prisma = new NewPrismaClient();
-    console.log('Seeding categories...');
+  async moveData() {
+    console.log('Starting migration process...');
     
-    const categoriesData = [
-      { id: 'category1', name: { en: 'Vehicle knowledge, maneuvering', ar: 'معرفة المركبات، المناورة' }},
-      { id: 'category2', name: { en: 'Environment', ar: 'البيئة' }},
-      // Add other categories here...
-    ];
-
-    const languages = await prisma.language.findMany();
-    const languageCodeToId = Object.fromEntries(languages.map(lang => [lang.code, lang.id]));
-
-    for (const category of categoriesData) {
-      const existingCategory = await prisma.category.findUnique({ where: { id: category.id } });
-
-      if (!existingCategory) {
-        await prisma.category.create({
-          data: {
-            id: category.id,
-            image: `${category.id}.jpg`,
-            name: {
-              create: Object.entries(category.name).map(([langCode, value]) => ({
-                value,
-                language: { connect: { id: languageCodeToId[langCode] } },
-              })).filter(name => name.value), // Filter out null/undefined values
-            },
-          },
-        });
-        console.log(`Created category: ${category.id}`);
-      } else {
-        console.log(`Category ${category.id} already exists, updating names if necessary.`);
-      }
+    try {
+      await this.resetDatabase();
+      await this.migrateActiveUsersData();
+      
+      return { success: true, message: 'Migration completed successfully' };
+    } catch (error) {
+      console.error('Migration failed:', error);
+      throw error;
     }
+  }
 
-    console.log('Categories seeding completed.');
+  private generateSecurePassword(length = 32) {
+    return crypto.randomBytes(length).toString('hex');
+  }
+
+  async resetDatabase() {
+    console.log('Starting database reset...');
+
+    try {
+      await this.newPrisma.answeredQuestion.deleteMany({});
+      await this.newPrisma.attemptQuestion.deleteMany({});
+      await this.newPrisma.questionMedia.deleteMany({});
+      await this.newPrisma.userAttempt.deleteMany({});
+      await this.newPrisma.answer.deleteMany({});
+      await this.newPrisma.text.deleteMany({});
+      await this.newPrisma.media.deleteMany({});
+      await this.newPrisma.question.deleteMany({});
+      await this.newPrisma.course.deleteMany({});
+      await this.newPrisma.category.deleteMany({});
+      await this.newPrisma.user.deleteMany({});
+      await this.newPrisma.admin.deleteMany({});
+      await this.newPrisma.settings.deleteMany({});
+      await this.newPrisma.language.deleteMany({});
+
+      console.log('Database reset completed');
+    } catch (error) {
+      console.error('Error resetting database:', error);
+      throw error;
+    }
+  }
+
+  async migrateActiveUsersData() {
+    const processedIds = new Set<string>();
+
+    try {
+      console.log('Starting migration of active users and their data...');
+
+      // 1. Get active users
+      const activeUsers = await this.oldPrisma.users.findMany({
+        where: {
+          deletedAt: null,
+          enabled: true,
+          activationDate: {
+            gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
+          }
+        },
+        include: {
+          UsersGroups: true,
+          UsersRelations: true
+        }
+      });
+
+      console.log(`Found ${activeUsers.length} active users to migrate`);
+
+      // 2. Migrate Languages
+      const languages = await this.oldPrisma.languages.findMany({
+        where: { 
+          deletedAt: null,
+          enabled: true
+        }
+      });
+    
+      for (const lang of languages) {
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.language.create({
+            data: {
+              id: lang.id.toString(),
+              name: lang.name,
+              code: lang.code,
+              isActive: lang.enabled,
+              isRTL: lang.code === 'ar' || lang.code === 'he'
+            }
+          }),
+          'language'
+        );
+      }
+
+      console.log(`Migrated ${languages.length} languages`);
+
+      // 3. Create new models
+      await this.createNewModels();
+
+      // 4. Migrate users
+      for (const user of activeUsers) {
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.user.create({
+            data: {
+              id: user.id.toString(),
+              firstName: user.name.split(' ')[0],
+              lastName: user.name.split(' ').slice(1).join(' '),
+              personnr: user.personalNumber,
+              tel: user.phone || '',
+              email: user.email,
+              password: user.password || this.generateSecurePassword(),
+              isActive: true,
+              expiryDate: new Date(user.activationDate.getTime() + 180 * 24 * 60 * 60 * 1000)
+            }
+          }),
+          'user'
+        );
+      }
+
+      // 5. Get and migrate courses (groups)
+      const activeUserGroupIds = [...new Set(
+        activeUsers.flatMap(user => 
+          user.UsersGroups.map(ug => ug.gpId)
+        )
+      )];
+
+      const activeGroups = await this.oldPrisma.groups.findMany({
+        where: {
+          id: { in: activeUserGroupIds },
+          deletedAt: null,
+          enabled: true
+        },
+        include: {
+          GroupsLang: {
+            include: {
+              Languages: true
+            }
+          },
+          Media: true
+        }
+      });
+
+      console.log(`Migrating ${activeGroups.length} courses`);
+
+      for (const group of activeGroups) {
+        if (group.Media) {
+          await this.handleDuplicateCreate(
+            () => this.newPrisma.media.create({
+              data: {
+                id: group.Media.id.toString(),
+                url: group.Media.url,
+                type: group.Media.extension.startsWith('image/') ? 'image' : 'video',
+                description: group.Media.name
+              }
+            }),
+            'media'
+          );
+        }
+
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.course.create({
+            data: {
+              id: group.id.toString(),
+              image: group.Media?.id.toString(),
+              isActive: true,
+              name: {
+                create: group.GroupsLang.map(gl => ({
+                  value: gl.name,
+                  language: {
+                    connect: {
+                      id: gl.lang.toString()
+                    }
+                  }
+                }))
+              },
+              description: {
+                create: group.GroupsLang.map(gl => ({
+                  value: gl.desc || '',
+                  language: {
+                    connect: {
+                      id: gl.lang.toString()
+                    }
+                  }
+                }))
+              },
+              users: {
+                connect: activeUsers
+                  .filter(user => 
+                    user.UsersGroups.some(ug => ug.gpId === group.id)
+                  )
+                  .map(user => ({
+                    id: user.id.toString()
+                  }))
+              }
+            }
+          }),
+          'course'
+        );
+      }
+
+      // 6. Migrate questions
+      const activeQuestions = await this.oldPrisma.relationsQuestions.findMany({
+        where: {
+          Relations: {
+            gpId: { in: activeUserGroupIds }
+          },
+          deletedAt: null
+        },
+        include: {
+          Questions: {
+            include: {
+              QuestionsLang: {
+                include: {
+                  Languages: true
+                }
+              }
+            }
+          },
+          Media: true,
+          Relations: true
+        }
+      });
+
+      console.log(`Migrating ${activeQuestions.length} questions`);
+
+      for (const rq of activeQuestions) {
+        const questionId = rq.Questions.id.toString();
+        
+        // Skip if already processed
+        if (processedIds.has(questionId)) {
+          console.log(`Skipping duplicate question ${questionId}`);
+          continue;
+        }
+        processedIds.add(questionId);
+
+        if (rq.Media) {
+          await this.handleDuplicateCreate(
+            () => this.newPrisma.media.create({
+              data: {
+                id: rq.Media.id.toString(),
+                url: rq.Media.url,
+                type: rq.Media.extension.startsWith('image/') ? 'image' : 'video',
+                description: rq.Media.name
+              }
+            }),
+            'media'
+          );
+        }
+
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.question.create({
+            data: {
+              id: questionId,
+              isActive: true,
+              course: {
+                connect: {
+                  id: rq.Relations.gpId.toString()
+                }
+              },
+              categories: {
+                connect: [{
+                  id: 'cat-theory'
+                }]
+              },
+              text: {
+                create: rq.Questions.QuestionsLang.map(ql => ({
+                  value: ql.text,
+                  language: {
+                    connect: {
+                      id: ql.lang.toString()
+                    }
+                  }
+                }))
+              },
+              hint: {
+                create: rq.Questions.QuestionsLang
+                  .filter(ql => ql.hint)
+                  .map(ql => ({
+                    value: ql.hint!,
+                    language: {
+                      connect: {
+                        id: ql.lang.toString()
+                      }
+                    }
+                  }))
+              }
+            }
+          }),
+          'question'
+        );
+
+        if (rq.Media) {
+          await this.handleDuplicateCreate(
+            () => this.newPrisma.questionMedia.create({
+              data: {
+                id: `${rq.qsId}-${rq.mdId}`,
+                questionId: questionId,
+                mediaId: rq.mdId.toString(),
+                order: rq.ordering
+              }
+            }),
+            'question media'
+          );
+        }
+      }
+
+      // 7. Migrate answers
+      const activeChoices = await this.oldPrisma.relationsChoices.findMany({
+        where: {
+          RelationsQuestions: {
+            Relations: {
+              gpId: { in: activeUserGroupIds }
+            }
+          },
+          deletedAt: null
+        },
+        include: {
+          Choices: {
+            include: {
+              ChoicesLang: {
+                include: {
+                  Languages: true
+                }
+              }
+            }
+          },
+          Media: true,
+          RelationsQuestions: true
+        }
+      });
+
+      console.log(`Migrating ${activeChoices.length} answers`);
+
+      for (const rc of activeChoices) {
+        if (rc.Media) {
+          await this.handleDuplicateCreate(
+            () => this.newPrisma.media.create({
+              data: {
+                id: rc.Media.id.toString(),
+                url: rc.Media.url,
+                type: rc.Media.extension.startsWith('image/') ? 'image' : 'video',
+                description: rc.Media.name
+              }
+            }),
+            'media'
+          );
+        }
+
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.answer.create({
+            data: {
+              id: rc.Choices.id.toString(),
+              isActive: true,
+              text: {
+                create: rc.Choices.ChoicesLang.map(cl => ({
+                  value: cl.text,
+                  language: {
+                    connect: {
+                      id: cl.lang.toString()
+                    }
+                  }
+                }))
+              },
+              isCorrect: rc.correct,
+              questionId: rc.RelationsQuestions.qsId.toString(),
+              mediaId: rc.mdId?.toString()
+            }
+          }),
+          'answer'
+        );
+      }
+
+      // 8. Migrate attempts
+      const userAttempts = await this.oldPrisma.usersRelations.findMany({
+        where: {
+          usId: { in: activeUsers.map(u => u.id) },
+          Relations: {
+            gpId: { in: activeUserGroupIds }
+          }
+        },
+        include: {
+          UsersRelationsDetails: {
+            include: {
+              RelationsChoices: true,
+              RelationsQuestions: true
+            }
+          },
+          Relations: true
+        }
+      });
+
+      console.log(`Migrating ${userAttempts.length} user attempts`);
+
+      for (const ur of userAttempts) {
+        const attempt = await this.handleDuplicateCreate(
+          () => this.newPrisma.userAttempt.create({
+            data: {
+              id: ur.id.toString(),
+              userId: ur.usId.toString(),
+              courseId: ur.Relations.gpId.toString(),
+              date: ur.createdAt || new Date(),
+              result: (ur.correct / (ur.correct + ur.wrong)) * 100,
+              isTimed: false,
+              isInstantResult: true,
+              currentQuestionIndex: 0,
+              endTime: ur.updatedAt,
+              categories: {
+                connect: [{
+                  id: 'cat-theory'
+                }]
+              }
+            }
+          }),
+          'user attempt'
+        );
+
+        if (attempt) {
+          // Create attempt questions
+          const attemptQuestions = ur.UsersRelationsDetails.map((detail, index) => ({
+            id: `${attempt.id}-q${index}`,
+            questionId: detail.RelationsQuestions.qsId.toString(),
+            order: index,
+            isMarked: true,
+            isAnswered: true
+          }));
+
+          for (const aq of attemptQuestions) {
+            await this.handleDuplicateCreate(
+              () => this.newPrisma.attemptQuestion.create({
+                data: {
+                  id: aq.id,
+                  userAttemptId: attempt.id,
+                  questionId: aq.questionId,
+                  order: aq.order,
+                  isMarked: aq.isMarked,
+                  isAnswered: aq.isAnswered
+                }
+              }),
+              'attempt question'
+            );
+          }
+
+          // Create answered questions
+          for (const detail of ur.UsersRelationsDetails) {
+            await this.handleDuplicateCreate(
+              () => this.newPrisma.answeredQuestion.create({
+                data: {
+                  id: detail.id.toString(),
+                  userAttemptId: attempt.id,
+                  answerId: detail.RelationsChoices.chId.toString()
+                }
+              }),
+              'answered question'
+            );
+          }
+        }
+      }
+
+      console.log('Migration completed successfully');
+    } catch (error) {
+      console.error('Migration failed:', error);
+      throw error;
+    } finally {
+      await this.oldPrisma.$disconnect();
+      await this.newPrisma.$disconnect();
+    }
+  }
+
+  async createNewModels() {
+    console.log('Creating new required models...');
+    
+    try {
+      const adminPassword = this.generateSecurePassword();
+      await this.handleDuplicateCreate(
+        () => this.newPrisma.admin.create({
+          data: {
+            id: 'default-admin',
+            name: 'System Admin',
+            email: 'admin@example.com',
+            password: adminPassword
+          }
+        }),
+        'admin'
+      );
+      console.log('Created admin account with password:', adminPassword);
+
+      await this.handleDuplicateCreate(
+        () => this.newPrisma.settings.create({
+          data: {
+            id: 'default-settings',
+            userAvailability: 180,
+            testTime: 60,
+            questionsPerTest: 70
+          }
+        }),
+        'settings'
+      );
+      console.log('Created default settings');
+
+      // Create default categories
+      const defaultCategories = [
+        { id: 'cat-theory', name: 'Theory Questions' },
+        { id: 'cat-practical', name: 'Practical Questions' },
+        { id: 'cat-safety', name: 'Safety Questions' }
+      ];
+
+      for (const category of defaultCategories) {
+        await this.handleDuplicateCreate(
+          () => this.newPrisma.category.create({
+            data: {
+              id: category.id,
+              name: {
+                create: {
+                  value: category.name,
+                  language: {
+                    connect: {
+                      id: '1'
+                    }
+                  }
+                }
+              }
+            }
+          }),
+          'category'
+        );
+      }
+      console.log('Created default categories');
+    } catch (error) {
+      console.error('Error creating new models:', error);
+      throw error;
+    }
   }
 }
