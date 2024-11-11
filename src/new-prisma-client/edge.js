@@ -263,7 +263,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\iCentre\\move-questions\\src\\new-prisma-client",
+      "value": "D:\\move-questions\\src\\new-prisma-client",
       "fromEnvVar": null
     },
     "config": {
@@ -285,7 +285,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\iCentre\\move-questions\\prisma\\schema-new.prisma",
+    "sourceFilePath": "D:\\move-questions\\prisma\\schema-new.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
