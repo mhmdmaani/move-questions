@@ -329,29 +329,28 @@ export class AppService {
       }
 
       // 7. Migrate answers
-      const activeChoices = await this.oldPrisma.relationsChoices.findMany({
-        where: {
-          RelationsQuestions: {
-            Relations: {
-              gpId: { in: activeUserGroupIds }
-            }
-          },
-          deletedAt: null
-        },
-        include: {
-          Choices: {
-            include: {
-              ChoicesLang: {
-                include: {
-                  Languages: true
-                }
-              }
-            }
-          },
-          Media: true,
-          RelationsQuestions: true
+      // 7. Migrate answers
+const activeChoices = await this.oldPrisma.relationsChoices.findMany({
+  where: {
+    RelationsQuestions:{
+      deletedAt: null
+    },
+    deletedAt: null
+  },
+  include: {
+    Choices: {
+      include: {
+        ChoicesLang: {
+          include: {
+            Languages: true
+          }
         }
-      });
+      }
+    },
+    Media: true,
+    RelationsQuestions: true
+  }
+});
 
       console.log(`Migrating ${activeChoices.length} answers`);
 
@@ -369,7 +368,8 @@ export class AppService {
             'media'
           );
         }
-
+        console.log("====relationQuestion=========")
+        console.log(rc.RelationsQuestions)
         await this.handleDuplicateCreate(
           () => this.newPrisma.answer.create({
             data: {
@@ -394,91 +394,8 @@ export class AppService {
         );
       }
 
-      // 8. Migrate attempts
-      const userAttempts = await this.oldPrisma.usersRelations.findMany({
-        where: {
-          usId: { in: activeUsers.map(u => u.id) },
-          Relations: {
-            gpId: { in: activeUserGroupIds }
-          }
-        },
-        include: {
-          UsersRelationsDetails: {
-            include: {
-              RelationsChoices: true,
-              RelationsQuestions: true
-            }
-          },
-          Relations: true
-        }
-      });
-
-      console.log(`Migrating ${userAttempts.length} user attempts`);
-
-      for (const ur of userAttempts) {
-        const attempt = await this.handleDuplicateCreate(
-          () => this.newPrisma.userAttempt.create({
-            data: {
-              id: ur.id.toString(),
-              userId: ur.usId.toString(),
-              courseId: ur.Relations.gpId.toString(),
-              date: ur.createdAt || new Date(),
-              result: (ur.correct / (ur.correct + ur.wrong)) * 100,
-              isTimed: false,
-              isInstantResult: true,
-              currentQuestionIndex: 0,
-              endTime: ur.updatedAt,
-              categories: {
-                connect: [{
-                  id: 'cat-theory'
-                }]
-              }
-            }
-          }),
-          'user attempt'
-        );
-
-        if (attempt) {
-          // Create attempt questions
-          const attemptQuestions = ur.UsersRelationsDetails.map((detail, index) => ({
-            id: `${attempt.id}-q${index}`,
-            questionId: detail.RelationsQuestions.qsId.toString(),
-            order: index,
-            isMarked: true,
-            isAnswered: true
-          }));
-
-          for (const aq of attemptQuestions) {
-            await this.handleDuplicateCreate(
-              () => this.newPrisma.attemptQuestion.create({
-                data: {
-                  id: aq.id,
-                  userAttemptId: attempt.id,
-                  questionId: aq.questionId,
-                  order: aq.order,
-                  isMarked: aq.isMarked,
-                  isAnswered: aq.isAnswered
-                }
-              }),
-              'attempt question'
-            );
-          }
-
-          // Create answered questions
-          for (const detail of ur.UsersRelationsDetails) {
-            await this.handleDuplicateCreate(
-              () => this.newPrisma.answeredQuestion.create({
-                data: {
-                  id: detail.id.toString(),
-                  userAttemptId: attempt.id,
-                  answerId: detail.RelationsChoices.chId.toString()
-                }
-              }),
-              'answered question'
-            );
-          }
-        }
-      }
+      
+    
 
       console.log('Migration completed successfully');
     } catch (error) {
