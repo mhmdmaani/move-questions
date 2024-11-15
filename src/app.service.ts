@@ -1,5 +1,5 @@
-import { PrismaClient as OldPrismaClient } from '../src/old-prisma-client';
-import { PrismaClient as NewPrismaClient } from '../src/new-prisma-client';
+import { PrismaClient as OldPrismaClient } from '../old-prisma-client';
+import { PrismaClient as NewPrismaClient } from '../new-prisma-client';
 
 export class AppService {
   private oldPrisma: OldPrismaClient;
@@ -62,23 +62,37 @@ export class AppService {
     });
 
     for (const group of groups) {
-      const courseNames = group.GroupsLang.map((gl) => ({
-        value: gl.name,
-        language: {
-          connect: {
-            code: gl.Languages.code,
-          },
-        },
-      }));
+      const courseNames = await Promise.all(
+        group.GroupsLang.map(async (gl) => {
+          const language = await this.newPrisma.language.findFirst({
+            where: { code: gl.Languages.code },
+          });
+          return {
+            value: gl.name,
+            language: {
+              connect: {
+                id: language?.id,
+              },
+            },
+          };
+        }),
+      );
 
-      const courseDescriptions = group.GroupsLang.map((gl) => ({
-        value: gl.desc || '',
-        language: {
-          connect: {
-            code: gl.Languages.code,
-          },
-        },
-      }));
+      const courseDescriptions = await Promise.all(
+        group.GroupsLang.map(async (gl) => {
+          const language = await this.newPrisma.language.findFirst({
+            where: { code: gl.Languages.code },
+          });
+          return {
+            value: gl.desc || '',
+            language: {
+              connect: {
+                id: language?.id,
+              },
+            },
+          };
+        }),
+      );
 
       await this.newPrisma.course.create({
         data: {
@@ -129,23 +143,37 @@ export class AppService {
     });
 
     for (const question of questions) {
-      const questionTexts = question.QuestionsLang.map((ql) => ({
-        value: ql.text,
-        language: {
-          connect: {
-            code: ql.Languages.code,
-          },
-        },
-      }));
+      const questionTexts = await Promise.all(
+        question.QuestionsLang.map(async (ql) => {
+          const language = await this.newPrisma.language.findFirst({
+            where: { code: ql.Languages.code },
+          });
+          return {
+            value: ql.text,
+            language: {
+              connect: {
+                id: language?.id,
+              },
+            },
+          };
+        }),
+      );
 
-      const questionHints = question.QuestionsLang.map((ql) => ({
-        value: ql.hint || '',
-        language: {
-          connect: {
-            code: ql.Languages.code,
-          },
-        },
-      }));
+      const questionHints = await Promise.all(
+        question.QuestionsLang.map(async (ql) => {
+          const language = await this.newPrisma.language.findFirst({
+            where: { code: ql.Languages.code },
+          });
+          return {
+            value: ql.hint || '',
+            language: {
+              connect: {
+                id: language?.id,
+              },
+            },
+          };
+        }),
+      );
 
       for (const relation of question.RelationsQuestions) {
         const newQuestion = await this.newPrisma.question.create({
@@ -181,14 +209,21 @@ export class AppService {
         });
 
         for (const choice of relation.RelationsChoices) {
-          const answerTexts = choice.Choices.ChoicesLang.map((cl) => ({
-            value: cl.text,
-            language: {
-              connect: {
-                code: cl.Languages.code,
-              },
-            },
-          }));
+          const answerTexts = await Promise.all(
+            choice.Choices.ChoicesLang.map(async (cl) => {
+              const language = await this.newPrisma.language.findFirst({
+                where: { code: cl.Languages.code },
+              });
+              return {
+                value: cl.text,
+                language: {
+                  connect: {
+                    id: language?.id,
+                  },
+                },
+              };
+            }),
+          );
 
           await this.newPrisma.answer.create({
             data: {
