@@ -7,6 +7,6 @@ export class AppController {
 
   @Get()
   async getHello() {
-    return this.appService.moveData();
+    return this.appService.migrateData();
   }
 }
