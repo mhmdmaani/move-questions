@@ -247,6 +247,7 @@ export class AppService {
 
       console.log(`Migrating ${activeQuestions.length} questions`);
 
+      // Process all questions first
       for (const rq of activeQuestions) {
         const questionId = rq.Questions.id.toString();
         
@@ -255,147 +256,194 @@ export class AppService {
           console.log(`Skipping duplicate question ${questionId}`);
           continue;
         }
-        processedIds.add(questionId);
 
-        if (rq.Media) {
-          await this.handleDuplicateCreate(
-            () => this.newPrisma.media.create({
-              data: {
-                id: rq.Media.id.toString(),
-                url: rq.Media.url,
-                type: rq.Media.extension.startsWith('image/') ? 'image' : 'video',
-                description: rq.Media.name
-              }
-            }),
-            'media'
-          );
-        }
-
-        await this.handleDuplicateCreate(
-          () => this.newPrisma.question.create({
-            data: {
-              id: questionId,
-              isActive: true,
-              course: {
-                connect: {
-                  id: rq.Relations.gpId.toString()
+        try {
+          if (rq.Media) {
+            await this.handleDuplicateCreate(
+              () => this.newPrisma.media.create({
+                data: {
+                  id: rq.Media.id.toString(),
+                  url: rq.Media.url,
+                  type: rq.Media.extension.startsWith('image/') ? 'image' : 'video',
+                  description: rq.Media.name
                 }
-              },
-              categories: {
-                connect: [{
-                  id: 'cat-theory'
-                }]
-              },
-              text: {
-                create: rq.Questions.QuestionsLang.map(ql => ({
-                  value: ql.text,
-                  language: {
-                    connect: {
-                      id: ql.lang.toString()
-                    }
+              }),
+              'media'
+            );
+          }
+
+          console.log(`Creating question ${questionId}`);
+          const createdQuestion = await this.handleDuplicateCreate(
+            () => this.newPrisma.question.create({
+              data: {
+                id: questionId,
+                isActive: true,
+                course: {
+                  connect: {
+                    id: rq.Relations.gpId.toString()
                   }
-                }))
-              },
-              hint: {
-                create: rq.Questions.QuestionsLang
-                  .filter(ql => ql.hint)
-                  .map(ql => ({
-                    value: ql.hint!,
+                },
+                categories: {
+                  connect: [{
+                    id: 'cat-theory'
+                  }]
+                },
+                text: {
+                  create: rq.Questions.QuestionsLang.map(ql => ({
+                    value: ql.text,
                     language: {
                       connect: {
                         id: ql.lang.toString()
                       }
                     }
                   }))
-              }
-            }
-          }),
-          'question'
-        );
-
-        if (rq.Media) {
-          await this.handleDuplicateCreate(
-            () => this.newPrisma.questionMedia.create({
-              data: {
-                id: `${rq.qsId}-${rq.mdId}`,
-                questionId: questionId,
-                mediaId: rq.mdId.toString(),
-                order: rq.ordering
+                },
+                hint: {
+                  create: rq.Questions.QuestionsLang
+                    .filter(ql => ql.hint)
+                    .map(ql => ({
+                      value: ql.hint,
+                      language: {
+                        connect: {
+                          id: ql.lang.toString()
+                        }
+                      }
+                    }))
+                },
+                questionMedia: rq.Media ? {
+                  create: [{
+                    mediaId: rq.Media.id.toString(),
+                    order: rq.ordering || 0
+                  }]
+                } : undefined
               }
             }),
-            'question media'
+            'question'
           );
-        }
-      }
 
-      // 7. Migrate answers
-      // 7. Migrate answers
-const activeChoices = await this.oldPrisma.relationsChoices.findMany({
-  where: {
-    RelationsQuestions:{
-      deletedAt: null
-    },
-    deletedAt: null
-  },
-  include: {
-    Choices: {
-      include: {
-        ChoicesLang: {
-          include: {
-            Languages: true
+          if (createdQuestion) {
+            console.log(`Successfully created question ${questionId}`);
+            processedIds.add(questionId);
+          } else {
+            console.log(`Failed to create question ${questionId}`);
           }
+        } catch (error) {
+          console.error(`Error creating question ${questionId}:`, error);
+          throw error;
         }
       }
-    },
-    Media: true,
-    RelationsQuestions: true
-  }
-});
 
-      console.log(`Migrating ${activeChoices.length} answers`);
+      // Verify questions exist before proceeding
+      console.log('Verifying migrated questions...');
+      const migratedQuestionIds = Array.from(processedIds);
+      const existingQuestions = await this.newPrisma.question.findMany({
+        where: {
+          id: {
+            in: migratedQuestionIds
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+      
+      console.log(`Found ${existingQuestions.length} questions out of ${migratedQuestionIds.length} expected`);
+      const existingQuestionIds = new Set(existingQuestions.map(q => q.id));
+
+      // 7. Now migrate choices/answers after all questions are created
+      const activeChoices = await this.oldPrisma.relationsChoices.findMany({
+        where: {
+          RelationsQuestions: {
+            deletedAt: null,
+            Relations: {
+              gpId: { in: activeUserGroupIds }
+            }
+          },
+          deletedAt: null
+        },
+        include: {
+          Choices: {
+            include: {
+              ChoicesLang: {
+                include: {
+                  Languages: true
+                }
+              }
+            }
+          },
+          Media: true,
+          RelationsQuestions: true
+        }
+      });
+
+      console.log(`Found ${activeChoices.length} potential answers to migrate`);
 
       for (const rc of activeChoices) {
-        if (rc.Media) {
-          await this.handleDuplicateCreate(
-            () => this.newPrisma.media.create({
+        const questionId = rc.RelationsQuestions.qsId.toString();
+        
+        // Skip if the related question wasn't migrated successfully
+        if (!existingQuestionIds.has(questionId)) {
+          console.log(`Skipping answer for non-existent question ${questionId}`);
+          continue;
+        }
+
+        try {
+          if (rc.Media) {
+            await this.handleDuplicateCreate(
+              () => this.newPrisma.media.create({
+                data: {
+                  id: rc.Media.id.toString(),
+                  url: rc.Media.url,
+                  type: rc.Media.extension.startsWith('image/') ? 'image' : 'video',
+                  description: rc.Media.name
+                }
+              }),
+              'media'
+            );
+          }
+
+          console.log(`Creating answer for question ${questionId}`);
+          const createdAnswer = await this.handleDuplicateCreate(
+            () => this.newPrisma.answer.create({
               data: {
-                id: rc.Media.id.toString(),
-                url: rc.Media.url,
-                type: rc.Media.extension.startsWith('image/') ? 'image' : 'video',
-                description: rc.Media.name
+                id: rc.Choices.id.toString(),
+                isActive: true,
+                text: {
+                  create: rc.Choices.ChoicesLang.map(cl => ({
+                    value: cl.text,
+                    language: {
+                      connect: {
+                        id: cl.lang.toString()
+                      }
+                    }
+                  }))
+                },
+                isCorrect: rc.correct,
+                question: {
+                  connect: {
+                    id: questionId
+                  }
+                },
+                media: rc.Media ? {
+                  connect: {
+                    id: rc.Media.id.toString()
+                  }
+                } : undefined
               }
             }),
-            'media'
+            'answer'
           );
-        }
-        console.log("====relationQuestion=========")
-        console.log(rc.RelationsQuestions)
-        await this.handleDuplicateCreate(
-          () => this.newPrisma.answer.create({
-            data: {
-              id: rc.Choices.id.toString(),
-              isActive: true,
-              text: {
-                create: rc.Choices.ChoicesLang.map(cl => ({
-                  value: cl.text,
-                  language: {
-                    connect: {
-                      id: cl.lang.toString()
-                    }
-                  }
-                }))
-              },
-              isCorrect: rc.correct,
-              questionId: rc.RelationsQuestions.qsId.toString(),
-              mediaId: rc.mdId?.toString()
-            }
-          }),
-          'answer'
-        );
-      }
 
-      
-    
+          if (createdAnswer) {
+            console.log(`Successfully created answer for question ${questionId}`);
+          } else {
+            console.log(`Failed to create answer for question ${questionId}`);
+          }
+        } catch (error) {
+          console.error(`Error creating answer for question ${questionId}:`, error);
+          throw error;
+        }
+      }
 
       console.log('Migration completed successfully');
     } catch (error) {

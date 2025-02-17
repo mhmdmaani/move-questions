@@ -431,7 +431,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "D:\\move-questions\\src\\old-prisma-client",
+      "value": "C:\\gitrepos\\move-questions\\src\\old-prisma-client",
       "fromEnvVar": null
     },
     "config": {
@@ -453,7 +453,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "D:\\move-questions\\prisma\\schema-old.prisma",
+    "sourceFilePath": "C:\\gitrepos\\move-questions\\prisma\\schema-old.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -467,6 +467,7 @@ const config = {
     "old_db"
   ],
   "activeProvider": "mysql",
+  "postinstall": false,
   "inlineDatasources": {
     "old_db": {
       "url": {

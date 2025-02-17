@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    
+     "start:custom": "cross-env PORT=3030 nest start",
     "build": "nest build && npm run copy-assets",
     "copy-assets": "copyfiles -u 1 '/old-prisma-client/**/*' '/new-prisma-client/**/*' dist/",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
